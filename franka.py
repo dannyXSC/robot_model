@@ -1,11 +1,14 @@
+import os
 import numpy as np
 import roboticstoolbox as rtb
 from spatialmath import SE3
 from urdf_parser_py.urdf import URDF
 import trimesh
 
-URDF_PATH = "./assets/urdf/franka.urdf"
-PACKAGE_PATH = "./assets/"
+PROJECT_PATH = os.path.dirname(__file__)
+
+URDF_PATH = os.path.join(PROJECT_PATH, "assets/urdf/franka.urdf")
+PACKAGE_PATH = os.path.join(PROJECT_PATH, "assets/")
 DEFAULT_JOINT_ANGLES = np.array(
     [
         0.02597709,
@@ -50,6 +53,7 @@ class Franka_Model:
         self.link_num = 0
         self.robot_tf = None
         self.joint_angles = []
+        self.cur_joint_angles = None
 
         self._load_urdf()
         self.reset()
@@ -71,9 +75,24 @@ class Franka_Model:
         self.link_num = len(self.bbox)
 
     def reset(self, joint_angles=DEFAULT_JOINT_ANGLES):
+        if joint_angles is None:
+            joint_angles = DEFAULT_JOINT_ANGLES
         self.robot_tf = Franka_TF()
         self.joint_angles = joint_angles
         self.current_tf = self.robot_tf.fkine_all(self.joint_angles)
+        self.cur_joint_angles = joint_angles
+
+    def get_tf(self, q):
+        """
+        获得从 current pos 到 q 的相对变换
+        """
+        default_tf = self.robot_tf.fkine_all(self.cur_joint_angles)
+        tf = self.robot_tf.fkine_all(q)
+
+        for i in range(len(tf)):
+            tf[i] = tf[i] * default_tf[i].inv()
+
+        return tf
 
     def point_to_link(self, points):
         bbox_array = np.asarray(self.bbox)  # shape: (link_num, 2, 3)
